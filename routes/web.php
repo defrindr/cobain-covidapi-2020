@@ -11,18 +11,13 @@
 |
 */
 
-// $router->get('/', function () use ($router) {
-//     return $router->app->version();
-// });
-// 
-
-
 $router->get('/','CovidController@index');
+$router->get('/provinces','CovidController@provinces');
 $router->get('/province/{province}','CovidController@province');
-$router->get('/jatim','CovidController@jatimall');
-$router->get('/jatim/{zone}','CovidController@jatim');
+$router->get('/jatim','CovidController@jatims');
 $router->get('/jatim/{zone}','CovidController@jatim');
 $router->get('/hospital','CovidController@getRs');
+$router->get('/worlds','CovidController@worlds');
 $router->get('/world/{nation}','CovidController@world');
 $router->get('/documentation',function() use($router){
 	return response("Read Documentation Here . \n<br> <a href='https://gist.github.com/defrindr/5771102cc73f48cfa8baf61fa45b63bc'>https://gist.github.com/defrindr/5771102cc73f48cfa8baf61fa45b63bc</a>");

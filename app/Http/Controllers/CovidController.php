@@ -10,7 +10,7 @@ class CovidController extends Controller
     protected $urlStatistic = 'https://services5.arcgis.com/VS6HdKS0VfIhv8Ct/arcgis/rest/services/Statistik_Perkembangan_COVID19_Indonesia/FeatureServer/0/query?f=json&where=1=1&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&outStatistics=[{"statisticType":"sum","onStatisticField":"Jumlah_Kasus_Baru_per_hari","outStatisticFieldName":"jumlah_kasus"},{"statisticType":"max","onStatisticField":"Jumlah_Pasien_Sembuh","outStatisticFieldName":"jumlah_sembuh"},{"statisticType":"max","onStatisticField":"Jumlah_Pasien_Meninggal","outStatisticFieldName":"jumlah_meninggal"}]&outSR=102100&cacheHint=true';
 
 
-    protected $urlPerProv = "https://services5.arcgis.com/VS6HdKS0VfIhv8Ct/arcgis/rest/services/COVID19_Indonesia_per_Provinsi/FeatureServer/0/query?f=json&where=(Provinsi+like+'%{template}%')&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Kasus_Posi&resultOffset=0&resultRecordCount=34&cacheHint=true";
+    protected $urlPerProv = "https://services5.arcgis.com/VS6HdKS0VfIhv8Ct/arcgis/rest/services/COVID19_Indonesia_per_Provinsi/FeatureServer/0/query?f=json&where={template}&returnGeometry=false&spatialRel=esriSpatialRelIntersects&outFields=*&orderByFields=Kasus_Posi&resultOffset=0&resultRecordCount=34&cacheHint=true";
 
 
     protected $urlJatim = "https://services8.arcgis.com/yTQgcgZWR10MGhD2/ArcGIS/rest/services/Data_Covid_Jatim/FeatureServer/0/query?where={whereTemplate}&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&resultType=none&outFields=*&returnGeometry=false&orderByFields=POSITIF+DESC&quantizationParameters=&f=json";
@@ -22,24 +22,10 @@ class CovidController extends Controller
     protected $urlRs = "https://services5.arcgis.com/VS6HdKS0VfIhv8Ct/arcgis/rest/services/RS_Rujukan_COVID19_Indonesia/FeatureServer/0/query?f=json&where={template}&spatialRel=esriSpatialRelIntersects&outFields=*";
 
 
-
-
-
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        //
-    }
-
-
     /**
      * index
      * @param  Request $r 
-     * @return [type]     ["jumlah_kasus" => 0, "jumlah_sembuh" => 0, "jumlah_meninggal"]
+     * @return      ["jumlah_kasus" => 0, "jumlah_sembuh" => 0, "jumlah_meninggal"]
      */
     public function index(Request $r){
             $sources = $this->request($this->urlStatistic);
@@ -65,7 +51,47 @@ class CovidController extends Controller
      */
     public function province($province){
         $location = preg_replace('/\s/','+',$province);
-        $url = preg_replace("/\{template\}/", $location, $this->urlPerProv);
+        $url = preg_replace("/\{template\}/", "(Provinsi+like+'%$location%')", $this->urlPerProv);
+        $sources = $this->request($url);
+        if(is_array($sources)){
+            if($sources["success"] == false) return response()->json($sources);
+        }
+        $data = $sources->features;
+
+        if(count($data) <= 0){
+            return response()->json([
+                "success" => false,
+                "message" => "Data tidak ditemukan",
+                "data" => [],
+                "count" => 0,
+            ]);
+        }else{
+            $finalData = [];
+            foreach ($data as $row) {
+                array_push($finalData, [
+                    "provinsi" => $row->attributes->Provinsi,
+                    "kasus_positif" => $row->attributes->Kasus_Posi,
+                    "kasus_sembuh" => $row->attributes->Kasus_Semb,
+                    "kasus_meninggal" => $row->attributes->Kasus_Meni,
+                ]);
+            }
+            return response()->json([
+                "success" => true,
+                "message" => "Data berhasil didapatkan",
+                "data" => $finalData,
+                "count" => count($finalData),
+            ]);
+        }
+    }
+    
+    
+    /**
+     * [province description]
+     * @param  [type] $province [description]
+     * @return [type]           [description]
+     */
+    public function provinces(){
+        $url = preg_replace("/\{template\}/", "1=1", $this->urlPerProv);
         $sources = $this->request($url);
         if(is_array($sources)){
             if($sources["success"] == false) return response()->json($sources);
@@ -112,6 +138,7 @@ class CovidController extends Controller
     // "Keterangan": "RS Rujukan Muhammadiyah & Aisyiyah",
     // "X": 111.471631,
     // "Y": -7.86843,
+    // 
     public function getRs(Request $r){
         // ( Provinsi = 'Jawa Timur' ) AND ( (Nama like '%ponorogo%')  OR (Alamat like '%ponorogo%') )
         $query = [];
@@ -135,7 +162,7 @@ class CovidController extends Controller
 
         $query = join(" AND ",$query);
         $url = preg_replace("/\{template\}/", $query, $this->urlRs);
-        // dd($this->rSpace($url));
+
         $sources = $this->request($this->rSpace($url));
         if(is_array($sources)){
             if($sources["success"] == false) return response()->json($sources);
@@ -206,8 +233,51 @@ class CovidController extends Controller
             foreach ($data as $row) {
                 array_push($finalData,[
                     "nama_negara" => $row->attributes->Country_Region,
-                    "jumlah_positif" => $row->attributes->Confirmed,
-                    "jumlah_meninngal" => $row->attributes->Deaths,
+                    "jumlah_kasus" => $row->attributes->Confirmed,
+                    "jumlah_meninggal" => $row->attributes->Deaths,
+                    "jumlah_sembuh" => $row->attributes->Recovered,
+                    "jumlah_kasus_aktif" => $row->attributes->Active,
+                    "update_terakhir" => substr((string)$row->attributes->Last_Update,0,-3),
+                ]);
+            }
+
+            return response()->json([
+                "success" => true,
+                "message" => "Data berhasil didapatkan",
+                "data" => $finalData,
+                "count" => count($finalData),
+            ]);
+        }
+    }
+
+
+    /**
+     * [world description]
+     * @param  [type] $nation [description]
+     * @return [type]         [description]
+     */
+    public function worlds(){
+        $url = preg_replace("/\{worldTemplate\}/", "1=1", $this->urlWorld);
+        $sources = $this->request($this->rSpace($url));
+        if(is_array($sources)){
+            if($sources["success"] == false) return response()->json($sources);
+        }
+        $data = $sources->features;
+
+        if(count($data) <= 0){
+            return response()->json([
+                "success" => false,
+                "message" => "Data tidak ditemukan",
+                "data" => [],
+                "count" => 0,
+            ]);
+        }else{
+            $finalData = [];
+            foreach ($data as $row) {
+                array_push($finalData,[
+                    "nama_negara" => $row->attributes->Country_Region,
+                    "jumlah_kasus" => $row->attributes->Confirmed,
+                    "jumlah_meninggal" => $row->attributes->Deaths,
                     "jumlah_sembuh" => $row->attributes->Recovered,
                     "jumlah_kasus_aktif" => $row->attributes->Active,
                     "update_terakhir" => substr((string)$row->attributes->Last_Update,0,-3),
@@ -239,7 +309,7 @@ class CovidController extends Controller
             "jumlah_meninggal"
      * ], "count" => 0]
      */
-    public function jatimall(){
+    public function jatims(){
         $url = preg_replace("/\{whereTemplate\}/", "1=1", $this->urlJatim);
 
         $sources = $this->request($this->rSpace($url));
