@@ -1,3 +1,3 @@
 # COVID19_APIs
 
-source code api covid19
+source code https://api.covid.defrindr.my.id/
