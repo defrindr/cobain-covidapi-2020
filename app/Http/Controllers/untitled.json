@@ -1,0 +1,13 @@
+{
+    "success": true,
+    "message": "Data berhasil didapatkan",
+    "data": [{
+        "nama_negara": "Indonesia",
+        "jumlah_positif": 4557,
+        "jumlah_meninngal": 399,
+        "jumlah_sembuh": 380,
+        "jumlah_kasus_aktif": 3778,
+        "update_terakhir": "1586828554"
+    }],
+    "count": 1
+}
